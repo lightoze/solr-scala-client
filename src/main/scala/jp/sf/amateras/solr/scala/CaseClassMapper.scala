@@ -1,5 +1,7 @@
 package jp.sf.amateras.solr.scala
 
+import scala.collection.JavaConversions._
+
 /**
  * Provides conversion methods for Map and case class.
  */
@@ -13,7 +15,7 @@ private[scala] object CaseClassMapper {
     val clazz = m.erasure.asInstanceOf[Class[T]]
 
     val constructor = clazz.getConstructors()(0)
-    val paramTypes = constructor.getParameterTypes()
+    val paramTypes = constructor.getParameterTypes
     val params = paramTypes.map { getDefaultValue(_).asInstanceOf[java.lang.Object] }
 
     val instance = constructor.newInstance(params: _*).asInstanceOf[T]
@@ -23,11 +25,18 @@ private[scala] object CaseClassMapper {
         val value = map.get(field.getName).orNull
         if(field != null){
           field.setAccessible(true)
-          if(field.getType() == classOf[Option[_]]){
-            field.set(instance, Option(value))
+          val conv = if (field.getType.isAssignableFrom(classOf[List[_]])) {
+            if (value.isInstanceOf[java.util.Collection[_]]) {
+              value.asInstanceOf[java.util.Collection[_]].toList
+            } else {
+              value
+            }
+          } else if(field.getType == classOf[Option[_]]){
+            Option(value)
           } else {
-            field.set(instance, value)
+            value
           }
+          field.set(instance, conv)
         }
       } catch {
         case ex: Exception => // Ignore
@@ -42,15 +51,15 @@ private[scala] object CaseClassMapper {
    *
    */
   def class2map(instance: Any): Map[String, Any] = {
-    val fields = instance.getClass().getDeclaredFields()
+    val fields = instance.getClass.getDeclaredFields
     fields.map { field =>
       field.setAccessible(true)
       val value = field.get(instance)
 
       value match {
-        case Some(x) => (field.getName(), x)
-        case None    => (field.getName(), null)
-        case _       => (field.getName(), value)
+        case Some(x) => (field.getName, x)
+        case None    => (field.getName, null)
+        case _       => (field.getName, value)
       }
     }.toMap
   }
