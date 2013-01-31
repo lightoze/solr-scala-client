@@ -9,10 +9,11 @@ import org.apache.solr.common.SolrDocumentList
 
 import jp.sf.amateras.solr.scala.query.ExpressionParser
 import jp.sf.amateras.solr.scala.query.QueryTemplate
+import org.apache.solr.common.params.CommonParams
 
 class QueryBuilder(server: SolrServer, query: String)(implicit parser: ExpressionParser) {
 
-  private val solrQuery = new SolrQuery()
+  private val solrQuery = new SolrQuery(query)
 
   /**
    * Sets field names to retrieve by this query.
@@ -40,7 +41,7 @@ class QueryBuilder(server: SolrServer, query: String)(implicit parser: Expressio
   /**
    * Sets grouping field names.
    *
-   * @param grouping field names
+   * @param fields field names
    */
   def groupBy(fields: String*): QueryBuilder = {
     if(fields.size > 0){
@@ -62,22 +63,63 @@ class QueryBuilder(server: SolrServer, query: String)(implicit parser: Expressio
   }
 
   /**
+   * Sets filter queries.
+   *
+   * @param filterQueries filter queries
+   */
+  def filter(filterQueries: String*) = {
+    solrQuery.addFilterQuery(filterQueries: _*)
+    this
+  }
+
+  /**
    * Specifies the maximum number of results to return.
-   * 
+   *
    * @param rows number of results
    */
   def rows(rows: Int) = {
     solrQuery.setRows(rows)
     this
   }
-    
+
   /**
    * Sets the offset to start at in the result set.
-   * 
+   *
    * @param start zero-based offset
    */
   def start(start: Int) = {
     solrQuery.setStart(start)
+    this
+  }
+
+  /**
+   * Sets request handler.
+   *
+   * @param qt request handler
+   */
+  def requestHandler(qt: String) = {
+    solrQuery.setRequestHandler(qt)
+    this
+  }
+
+  /**
+   * Sets query parameter.
+   *
+   * @param name parameter name
+   * @param values parameter values to add
+   */
+  def param(name: String, values: String*) = {
+    solrQuery.add(name, values: _*)
+    this
+  }
+
+  /**
+   * Calls arbitrary function over SolrJ query object.
+   *
+   * @param configurator configurator function
+   */
+  def configure(configurator: (SolrQuery => Unit)) = {
+    configurator(solrQuery)
     this
   }
 
@@ -92,37 +134,45 @@ class QueryBuilder(server: SolrServer, query: String)(implicit parser: Expressio
     def toList(docList: SolrDocumentList): List[Map[String, Any]] = {
       (for(i <- 0 to docList.size() - 1) yield {
         val doc = docList.get(i)
-        doc.getFieldNames().asScala.map { key => (key, doc.getFieldValue(key)) }.toMap
+        doc.getFieldNames.asScala.map { key => (key, doc.getFieldValue(key)) }.toMap
       }).toList
     }
 
-    solrQuery.setQuery(new QueryTemplate(query).merge(CaseClassMapper.toMap(params)))
+    def mergeParams(name: String) = if (params != null) {
+      val values = solrQuery.getParams(name)
+      if (values != null) {
+        values.transform(value => new QueryTemplate(value).merge(CaseClassMapper.toMap(params)))
+      }
+    }
+
+    mergeParams(CommonParams.Q)
+    mergeParams(CommonParams.FQ)
 
     val response = server.query(solrQuery)
 
     val queryResult = solrQuery.getParams("group") match {
       case null => {
-        toList(response.getResults())
+        toList(response.getResults)
       }
       case _ => {
-        val groupResponse = response.getGroupResponse()
-        groupResponse.getValues().asScala.map { groupCommand =>
-          groupCommand.getValues().asScala.map { group =>
-            toList(group.getResult())
+        val groupResponse = response.getGroupResponse
+        groupResponse.getValues.asScala.map { groupCommand =>
+          groupCommand.getValues.asScala.map { group =>
+            toList(group.getResult)
           }.flatten
         }.flatten.toList
       }
     }
 
-    val facetResult = response.getFacetFields() match {
+    val facetResult = response.getFacetFields match {
       case null => Map.empty[String, Map[String, Long]]
       case facetFields => facetFields.asScala.map { field => (
-          field.getName(),
-          field.getValues().asScala.map { value => (value.getName(), value.getCount()) }.toMap
+          field.getName,
+          field.getValues.asScala.map { value => (value.getName, value.getCount) }.toMap
       )}.toMap
     }
 
-    MapQueryResult(response.getResults().getNumFound(), queryResult, facetResult)
+    MapQueryResult(response.getResults.getNumFound, queryResult, facetResult)
   }
 
   /**
