@@ -14,6 +14,8 @@ resolvers += "Local Maven Repository" at "file:///"+Path.userHome.absolutePath+"
 
 libraryDependencies ++= Seq(
   "org.apache.solr" % "solr-solrj" % "4.1.0" % "compile",
+  "joda-time" % "joda-time" % "2.1" % "optional",
+  "org.joda" % "joda-convert" % "1.2" % "optional",
   "org.scalatest" %% "scalatest" % "1.7.1" % "test",
   "org.mockito" % "mockito-core" % "1.9.0" % "test"
 )
