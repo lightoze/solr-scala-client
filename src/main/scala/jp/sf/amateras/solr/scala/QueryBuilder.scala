@@ -150,6 +150,7 @@ class QueryBuilder(server: SolrServer, query: String)(implicit parser: Expressio
 
     val response = server.query(solrQuery)
 
+    val numFound = if (response.getResults != null) response.getResults.getNumFound else 0
     val queryResult = solrQuery.getParams("group") match {
       case null => {
         toList(response.getResults)
@@ -174,13 +175,17 @@ class QueryBuilder(server: SolrServer, query: String)(implicit parser: Expressio
 
     val spellcheck = response.getSpellCheckResponse match {
       case null => new SpellcheckResult(Nil, Map.empty)
-      case spell => new SpellcheckResult(
-        spell.getCollatedResults.asScala.map(_.getCollationQueryString).toList,
-        spell.getSuggestionMap.asScala.mapValues(_.getAlternatives.asScala.toList).toMap
-      )
+      case spell => {
+        val collations = if (spell.getCollatedResults != null) spell.getCollatedResults.asScala else Nil
+        val suggestions = spell.getSuggestionMap.asScala
+        new SpellcheckResult(
+          collations.map(_.getCollationQueryString).toList,
+          suggestions.mapValues(_.getAlternatives.asScala.toList).toMap
+        )
+      }
     }
 
-    MapQueryResult(response.getResults.getNumFound, queryResult, facetResult, spellcheck)
+    MapQueryResult(numFound, queryResult, facetResult, spellcheck)
   }
 
   /**
