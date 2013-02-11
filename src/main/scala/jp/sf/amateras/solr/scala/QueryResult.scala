@@ -10,9 +10,17 @@ package jp.sf.amateras.solr.scala
 case class MapQueryResult(
     numFound: Long,
     documents: List[Map[String, Any]],
-    facetFields: Map[String, Map[String, Long]])
+    facetFields: Map[String, Map[String, Long]],
+    spellcheck: SpellcheckResult)
 
 case class CaseClassQueryResult[T](
     numFound: Long,
     documents: List[T],
-    facetFields: Map[String, Map[String, Long]])
+    facetFields: Map[String, Map[String, Long]],
+    spellcheck: SpellcheckResult)
+
+case class SpellcheckResult(
+    collations: List[String],
+    suggestions: Map[String, List[String]]) {
+  def collation: Option[String] = collations.headOption
+}

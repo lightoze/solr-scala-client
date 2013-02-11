@@ -1,7 +1,6 @@
 package jp.sf.amateras.solr.scala
 
-import scala.collection.JavaConverters.asScalaBufferConverter
-import scala.collection.JavaConverters.collectionAsScalaIterableConverter
+import scala.collection.JavaConverters._
 
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrServer
@@ -131,8 +130,9 @@ class QueryBuilder(server: SolrServer, query: String)(implicit parser: Expressio
    */
   def getResultAsMap(params: Any = null): MapQueryResult = {
 
-    def toList(docList: SolrDocumentList): List[Map[String, Any]] = {
-      (for(i <- 0 to docList.size() - 1) yield {
+    def toList(docList: SolrDocumentList): List[Map[String, Any]] = docList match {
+      case null => Nil
+      case _ => (for(i <- 0 to docList.size() - 1) yield {
         val doc = docList.get(i)
         doc.getFieldNames.asScala.map { key => (key, doc.getFieldValue(key)) }.toMap
       }).toList
@@ -172,7 +172,15 @@ class QueryBuilder(server: SolrServer, query: String)(implicit parser: Expressio
       )}.toMap
     }
 
-    MapQueryResult(response.getResults.getNumFound, queryResult, facetResult)
+    val spellcheck = response.getSpellCheckResponse match {
+      case null => new SpellcheckResult(Nil, Map.empty)
+      case spell => new SpellcheckResult(
+        spell.getCollatedResults.asScala.map(_.getCollationQueryString).toList,
+        spell.getSuggestionMap.asScala.mapValues(_.getAlternatives.asScala.toList).toMap
+      )
+    }
+
+    MapQueryResult(response.getResults.getNumFound, queryResult, facetResult, spellcheck)
   }
 
   /**
@@ -189,7 +197,8 @@ class QueryBuilder(server: SolrServer, query: String)(implicit parser: Expressio
       result.documents.map { doc =>
         CaseClassMapper.map2class[T](doc)
       },
-      result.facetFields
+      result.facetFields,
+      result.spellcheck
     )
 
   }
