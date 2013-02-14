@@ -1,4 +1,4 @@
-package jp.sf.amateras.solr.scala.query;
+package jp.sf.amateras.solr.scala.query
 
 object QueryUtils {
   
@@ -14,8 +14,8 @@ object QueryUtils {
   def escape(value: String): String =
     value.toString.map { c =>
       c match {
-        case '\\' => Seq('\\', '\\', '\\', '\\')
-        case _ if specialCharacters.contains(c) => Seq('\\', '\\', c)
+        case '\\' => Seq('\\', '\\')
+        case _ if specialCharacters.contains(c) => Seq('\\', c)
         case _ => Seq(c)
       }
     }.flatten.mkString
