@@ -9,6 +9,7 @@ import org.apache.solr.common.SolrDocumentList
 import jp.sf.amateras.solr.scala.query.ExpressionParser
 import jp.sf.amateras.solr.scala.query.QueryTemplate
 import org.apache.solr.common.params.CommonParams
+import java.util.Date
 
 class QueryBuilder(server: SolrServer, query: String)(implicit parser: ExpressionParser) {
 
@@ -58,6 +59,48 @@ class QueryBuilder(server: SolrServer, query: String)(implicit parser: Expressio
   def facetFields(fields: String*): QueryBuilder = {
     solrQuery.setFacet(true)
     solrQuery.addFacetField(fields: _*)
+    this
+  }
+
+  /**
+   * Sets facet for integer numeric range.
+   *
+   * @param field The field
+   * @param start The start of range
+   * @param end The end of the range
+   * @param gap The gap between each count
+   */
+  def facetNumericRange(field: String, start:Int, end:Long, gap:Long): QueryBuilder = {
+    solrQuery.setFacet(true)
+    solrQuery.addNumericRangeFacet(field, start, end, gap)
+    this
+  }
+
+  /**
+   * Sets facet for floating-point numeric range.
+   *
+   * @param field The field
+   * @param start The start of range
+   * @param end The end of the range
+   * @param gap The gap between each count
+   */
+  def facetNumericRange(field: String, start:Double, end:Double, gap:Double): QueryBuilder = {
+    solrQuery.setFacet(true)
+    solrQuery.addNumericRangeFacet(field, start, end, gap)
+    this
+  }
+
+  /**
+   * Sets facet for date range.
+   *
+   * @param field The field
+   * @param start The start of range
+   * @param end The end of the range
+   * @param gap The gap between each count
+   */
+  def facetDateRange(field: String, start:Date, end:Date, gap:String): QueryBuilder = {
+    solrQuery.setFacet(true)
+    solrQuery.addDateRangeFacet(field, start, end, gap)
     this
   }
 
@@ -173,6 +216,14 @@ class QueryBuilder(server: SolrServer, query: String)(implicit parser: Expressio
       )}.toMap
     }
 
+    val facetRangeResult = response.getFacetRanges match {
+      case null => Map.empty[String, Map[String, Int]]
+      case facetRanges => facetRanges.asScala.map { field => (
+          field.getName,
+          field.getCounts.asScala.map { value => (value.getValue, value.getCount) }.toMap
+      )}.toMap
+    }
+
     val spellcheck = response.getSpellCheckResponse match {
       case null => new SpellcheckResult(Nil, Map.empty)
       case spell => {
@@ -185,7 +236,7 @@ class QueryBuilder(server: SolrServer, query: String)(implicit parser: Expressio
       }
     }
 
-    MapQueryResult(numFound, queryResult, facetResult, spellcheck)
+    MapQueryResult(numFound, queryResult, facetResult, facetRangeResult, spellcheck)
   }
 
   /**
@@ -203,6 +254,7 @@ class QueryBuilder(server: SolrServer, query: String)(implicit parser: Expressio
         CaseClassMapper.map2class[T](doc)
       },
       result.facetFields,
+      result.facetRanges,
       result.spellcheck
     )
 

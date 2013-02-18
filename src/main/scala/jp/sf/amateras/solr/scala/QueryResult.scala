@@ -11,12 +11,14 @@ case class MapQueryResult(
     numFound: Long,
     documents: List[Map[String, Any]],
     facetFields: Map[String, Map[String, Long]],
+    facetRanges: Map[String, Map[String, Int]],
     spellcheck: SpellcheckResult)
 
 case class CaseClassQueryResult[T](
     numFound: Long,
     documents: List[T],
     facetFields: Map[String, Map[String, Long]],
+    facetRanges: Map[String, Map[String, Int]],
     spellcheck: SpellcheckResult)
 
 case class SpellcheckResult(
